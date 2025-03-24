@@ -18,6 +18,7 @@ extern TaskHandle_t outputTaskHandle;
 // Synchronization and communication
 extern SemaphoreHandle_t buttonSemaphore;
 extern QueueHandle_t dataQueue;
+extern SemaphoreHandle_t serialMutex;  // Mutex for protecting serial output
 
 // Pin definitions
 #define BUTTON_PIN          2   // Button connected to pin 2
