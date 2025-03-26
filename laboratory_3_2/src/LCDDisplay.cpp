@@ -13,37 +13,21 @@ void LCDDisplay::init() {
     lcd->backlight();
     lcd->clear();
     lcd->setCursor(0, 0);
-    lcd->print("Sensor System");
+    lcd->print("DHT11 Sensor");
+    lcd->setCursor(0, 1);
+    lcd->print("Initializing...");
 }
 
-void LCDDisplay::clearLine(uint8_t line) {
-    lcd->setCursor(0, line);
-    for (int i = 0; i < 16; i++) {
-        lcd->print(" ");
-    }
-    lcd->setCursor(0, line);
+void LCDDisplay::displaySensorData(const char* data) {
+    lcd->setCursor(0, 1);
+    lcd->print("                "); // Clear line
+    lcd->setCursor(0, 1);
+    lcd->print(data);
 }
 
-void LCDDisplay::displayRawValue(int rawValue) {
-    // Display raw value on first line
-    clearLine(0);
-    lcd->print("Raw: ");
-    lcd->print(rawValue);
-    lcd->print(" cm");
-}
-
-void LCDDisplay::displayProcessedValue(int processedValue) {
-    // Display processed value on second line
-    clearLine(1);
-    lcd->print("Filt: ");
-    lcd->print(processedValue);
-    lcd->print(" cm");
-}
-
-void LCDDisplay::displayFilterInfo(float noiseReduction) {
-    // Temporarily show filter info on the second line
-    clearLine(1);
-    lcd->print("NR: ");
-    lcd->print(noiseReduction, 1); // 1 decimal place
-    lcd->print("%");
+void LCDDisplay::displaySystemState(const char* state) {
+    lcd->setCursor(0, 0);
+    lcd->print("                "); // Clear line
+    lcd->setCursor(0, 0);
+    lcd->print(state);
 } 

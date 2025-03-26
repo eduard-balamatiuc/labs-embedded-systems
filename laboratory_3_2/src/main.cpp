@@ -1,19 +1,16 @@
 #include <Arduino.h>
-#include <Arduino_FreeRTOS.h>
-#include "SerialIO.h"
 #include "TaskManager.h"
+#include "SerialIO.h"
 
 void setup() {
-  // Initialize serial communication with higher baud rate for detailed reports
-  SerialIO::init(115200);
-  
-  // Initialize and start tasks
-  initTasks();
-  
-  // Start the scheduler
-  vTaskStartScheduler();
+    // Initialize serial communication at 115200 baud
+    SerialIO::init(115200);
+    SerialIO::printMessage(F("System starting..."));
+    
+    // Initialize tasks and start the scheduler
+    initTasks();
 }
 
 void loop() {
-  // Empty - Tasks are handled by FreeRTOS
+    // FreeRTOS takes over - this loop won't be used
 } 

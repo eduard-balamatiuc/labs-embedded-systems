@@ -12,12 +12,8 @@ public:
     LCDDisplay(uint8_t address, uint8_t columns, uint8_t rows);
     ~LCDDisplay();
     void init();
-    
-    // Display methods
-    void displayRawValue(int rawValue);
-    void displayProcessedValue(int processedValue);
-    void displayFilterInfo(float noiseReduction);
-    void clearLine(uint8_t line);
+    void displaySensorData(const char* data);
+    void displaySystemState(const char* state);
 };
 
 #endif // LCD_DISPLAY_H 
