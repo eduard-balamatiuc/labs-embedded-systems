@@ -46,7 +46,14 @@ void initTasks() {
 void sensorTask(void* parameter) {
   TickType_t lastWakeTime = xTaskGetTickCount();
   
+  // Set up watchdog feed timer
+  esp_task_wdt_init(5, true); // 5 second timeout, panic on timeout
+  esp_task_wdt_add(NULL);     // Add current task to WDT watch
+  
   while (true) {
+    // Feed the watchdog
+    esp_task_wdt_reset();
+    
     // Send ultrasonic pulse
     digitalWrite(TRIG_PIN, LOW);
     delayMicroseconds(2);
@@ -54,11 +61,19 @@ void sensorTask(void* parameter) {
     delayMicroseconds(10);
     digitalWrite(TRIG_PIN, LOW);
     
-    // Read the pulse duration
-    long duration = pulseIn(ECHO_PIN, HIGH);
+    // Read the pulse duration with timeout to prevent blocking indefinitely
+    // Using 30ms timeout (equivalent to ~5m distance)
+    long duration = pulseIn(ECHO_PIN, HIGH, 30000);
     
-    // Convert to distance and apply filters
-    float rawDistance = convertPulseToCm(duration);
+    // If duration is 0, sensor didn't respond in time
+    float rawDistance;
+    if (duration == 0) {
+      rawDistance = MAX_DISTANCE_CM; // Assume maximum distance
+    } else {
+      // Convert to distance and apply filters
+      rawDistance = convertPulseToCm(duration);
+    }
+    
     rawDistance = saturateValue(rawDistance, MIN_DISTANCE_CM, MAX_DISTANCE_CM);
     
     float medianFiltered = saltPepperFilter(rawDistance);
@@ -72,6 +87,9 @@ void sensorTask(void* parameter) {
     
     // Send to queue - don't wait if queue is full (overwrite old data)
     xQueueOverwrite(distanceQueue, &data);
+    
+    // Feed the watchdog again before delay
+    esp_task_wdt_reset();
     
     // Use vTaskDelayUntil for precise timing
     vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS));
