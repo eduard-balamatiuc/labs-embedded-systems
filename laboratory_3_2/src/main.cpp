@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
+#include <stdio.h>
 #include "globals.h"
 
 // Ultrasonic sensor pins
@@ -27,6 +28,7 @@ float medianValues[MEDIAN_SAMPLES];
 float averageValues[AVERAGE_SAMPLES];
 
 void setup() {
+  // Initialize serial communication for printf
   Serial.begin(115200);
   
   // Ultrasonic sensor setup
@@ -46,7 +48,7 @@ void setup() {
     averageValues[i] = 0;
   }
   
-  Serial.println("Ultrasonic Sensor with Signal Conditioning");
+  printf("Ultrasonic Sensor with Signal Conditioning\n");
 }
 
 // Salt and pepper filter (median filter) to remove impulse noise
@@ -153,11 +155,8 @@ void loop() {
   float medianFiltered = saltPepperFilter(rawDistanceCm);
   filteredDistanceCm = weightedAverageFilter(medianFiltered);
   
-  // Display on Serial Monitor
-  Serial.print("Raw (cm): ");
-  Serial.print(rawDistanceCm, 1);
-  Serial.print("\tFiltered (cm): ");
-  Serial.println(filteredDistanceCm, 1);
+  // Display using printf
+  printf("Raw (cm): %.1f\tFiltered (cm): %.1f\n", rawDistanceCm, filteredDistanceCm);
   
   // Display on LCD
   lcd.clear();
