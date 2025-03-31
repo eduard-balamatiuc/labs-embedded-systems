@@ -1,114 +1,111 @@
 #include "TaskManager.h"
 #include "globals.h"
+#include "filter.h"
 
-// Task handles
+// Define task handles
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t displayTaskHandle = NULL;
 
-// Communication queue
-QueueHandle_t sensorDataQueue = NULL;
-
-// Filtering constants
-#define MEDIAN_SAMPLES 5
-#define AVERAGE_SAMPLES 5
-#define SOUND_SPEED 0.034
-#define MIN_DISTANCE_CM 2.0
-#define MAX_DISTANCE_CM 400.0
-
-// Function declarations from original code
-float saltPepperFilter(float newValue);
-float weightedAverageFilter(float newValue);
-float convertPulseToCm(long pulseTime);
-float saturateValue(float value, float min, float max);
+// Define queue
+QueueHandle_t distanceQueue = NULL;
 
 void initTasks() {
-    // Initialize LCD
-    lcd.init();
-    lcd.backlight();
-    
-    // Initialize sensor pins
-    pinMode(TRIG_PIN, OUTPUT);
-    pinMode(ECHO_PIN, INPUT);
-    
-    // Create communication queue
-    sensorDataQueue = xQueueCreate(5, sizeof(float));
-    if (sensorDataQueue == NULL) {
-        printf("Failed to create queue\n");
-        while(1);
-    }
-    
-    // Create tasks
-    xTaskCreate(
-        sensorTask,
-        "SensorTask",
-        2048,           // Larger stack for ESP32
-        NULL,
-        1,
-        &sensorTaskHandle
-    );
-    
-    xTaskCreate(
-        displayTask,
-        "DisplayTask",
-        2048,           // Larger stack for ESP32
-        NULL,
-        1,
-        &displayTaskHandle
-    );
-    
-    printf("Tasks initialized\n");
+  // Create the queue - only need to store a few readings
+  distanceQueue = xQueueCreate(1, sizeof(DistanceData));
+  if (distanceQueue == NULL) {
+    Serial.println("Failed to create queue");
+    return;
+  }
+  
+  // Create tasks with sufficient stack sizes
+  xTaskCreatePinnedToCore(
+    sensorTask,
+    "SensorTask",
+    2048,
+    NULL,
+    1,
+    &sensorTaskHandle,
+    0  // Run on core 0 (WiFi/BT core)
+  );
+  
+  xTaskCreatePinnedToCore(
+    displayTask,
+    "DisplayTask",
+    2048,
+    NULL,
+    1,
+    &displayTaskHandle,
+    1  // Run on core 1 (Arduino loop core)
+  );
+  
+  Serial.println("Tasks initialized");
 }
 
-void sensorTask(void* parameters) {
-    TickType_t lastWakeTime = xTaskGetTickCount();
+// Task to read sensor and perform filtering
+void sensorTask(void* parameter) {
+  TickType_t lastWakeTime = xTaskGetTickCount();
+  
+  while (true) {
+    // Send ultrasonic pulse
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
     
-    while (1) {
-        // Send ultrasonic pulse
-        digitalWrite(TRIG_PIN, LOW);
-        delayMicroseconds(2);
-        digitalWrite(TRIG_PIN, HIGH);
-        delayMicroseconds(10);
-        digitalWrite(TRIG_PIN, LOW);
-        
-        // Read the pulse duration
-        long duration = pulseIn(ECHO_PIN, HIGH);
-        float rawDistance = convertPulseToCm(duration);
-        
-        // Process data
-        rawDistance = saturateValue(rawDistance, MIN_DISTANCE_CM, MAX_DISTANCE_CM);
-        float medianFiltered = saltPepperFilter(rawDistance);
-        float filteredDistance = weightedAverageFilter(medianFiltered);
-        
-        // Send to queue
-        xQueueSend(sensorDataQueue, &filteredDistance, 0);
-        
-        // Precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(SENSOR_READING_PERIOD));
-    }
+    // Read the pulse duration
+    long duration = pulseIn(ECHO_PIN, HIGH);
+    
+    // Convert to distance and apply filters
+    float rawDistance = convertPulseToCm(duration);
+    rawDistance = saturateValue(rawDistance, MIN_DISTANCE_CM, MAX_DISTANCE_CM);
+    
+    float medianFiltered = saltPepperFilter(rawDistance);
+    float filteredDistance = weightedAverageFilter(medianFiltered);
+    
+    // Package data
+    DistanceData data = {
+      .rawDistance = rawDistance,
+      .filteredDistance = filteredDistance
+    };
+    
+    // Send to queue - don't wait if queue is full (overwrite old data)
+    xQueueOverwrite(distanceQueue, &data);
+    
+    // Use vTaskDelayUntil for precise timing
+    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS));
+  }
 }
 
-void displayTask(void* parameters) {
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    float distance;
-    
-    // Add initial offset
-    vTaskDelay(pdMS_TO_TICKS(100));
-    
-    while (1) {
-        if (xQueueReceive(sensorDataQueue, &distance, 0) == pdTRUE) {
-            // Print to Serial
-            printf("Distance: %.1f cm\n", distance);
-            
-            // Update LCD
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Distance:");
-            lcd.setCursor(0, 1);
-            lcd.print(distance, 1);
-            lcd.print(" cm");
-        }
-        
-        // Precise timing
-        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(DISPLAY_UPDATE_PERIOD));
+// Task to display data on LCD and serial
+void displayTask(void* parameter) {
+  TickType_t lastWakeTime = xTaskGetTickCount();
+  DistanceData data;
+  
+  // Offset display task to avoid contention
+  vTaskDelay(pdMS_TO_TICKS(50));
+  
+  while (true) {
+    // Get latest distance reading
+    if (xQueueReceive(distanceQueue, &data, 0) == pdTRUE) {
+      // Print to serial
+      Serial.printf("Raw: %.1f cm | Filtered: %.1f cm\n", 
+                  data.rawDistance, data.filteredDistance);
+      
+      // Update LCD
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Filt: ");
+      lcd.print(data.filteredDistance, 1);
+      lcd.print(" cm");
+      
+      lcd.setCursor(0, 1);
+      lcd.print("Raw: ");
+      lcd.print(data.rawDistance, 1);
+      lcd.print(" cm");
     }
+    
+    // Update display at defined intervals
+    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(DISPLAY_TASK_PERIOD_MS));
+  }
 }

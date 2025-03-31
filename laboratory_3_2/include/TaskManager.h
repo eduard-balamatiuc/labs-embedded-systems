@@ -1,29 +1,28 @@
-#ifndef TASK_MANAGER_H
-#define TASK_MANAGER_H
+#pragma once
 
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <LiquidCrystal_I2C.h>
+#include <freertos/queue.h>
 
 // Task handles
 extern TaskHandle_t sensorTaskHandle;
 extern TaskHandle_t displayTaskHandle;
 
-// Communication queue
-extern QueueHandle_t sensorDataQueue;
+// Communication data structure
+typedef struct {
+  float rawDistance;
+  float filteredDistance;
+} DistanceData;
 
-// Task parameters
-#define SENSOR_READING_PERIOD    100     // Sensor reading period (ms)
-#define DISPLAY_UPDATE_PERIOD    500     // Display update period (ms)
+// Queue handle
+extern QueueHandle_t distanceQueue;
 
-// Pin definitions
-#define TRIG_PIN    5
-#define ECHO_PIN    18
+// Task timing constants
+#define SENSOR_TASK_PERIOD_MS 100
+#define DISPLAY_TASK_PERIOD_MS 500
 
 // Function prototypes
 void initTasks();
-void sensorTask(void* parameters);
-void displayTask(void* parameters);
-
-#endif // TASK_MANAGER_H
+void sensorTask(void* parameter);
+void displayTask(void* parameter);
