@@ -1,6 +1,7 @@
 #include "TaskManager.h"
 #include "globals.h"
 #include "filter.h"
+#include <stdio.h>
 
 // Define task handles
 TaskHandle_t sensorTaskHandle = NULL;
@@ -13,7 +14,7 @@ void initTasks() {
   // Create the queue - only need to store a few readings
   distanceQueue = xQueueCreate(1, sizeof(DistanceData));
   if (distanceQueue == NULL) {
-    Serial.println("Failed to create queue");
+    printf("Failed to create queue\n");
     return;
   }
   
@@ -38,7 +39,7 @@ void initTasks() {
     1  // Run on core 1 (Arduino loop core)
   );
   
-  Serial.println("Tasks initialized");
+  printf("Tasks initialized\n");
 }
 
 // Task to read sensor and perform filtering
@@ -89,8 +90,8 @@ void displayTask(void* parameter) {
     // Get latest distance reading
     if (xQueueReceive(distanceQueue, &data, 0) == pdTRUE) {
       // Print to serial
-      Serial.printf("Raw: %.1f cm | Filtered: %.1f cm\n", 
-                  data.rawDistance, data.filteredDistance);
+      printf("Raw: %.1f cm | Filtered: %.1f cm\n", 
+             data.rawDistance, data.filteredDistance);
       
       // Update LCD
       lcd.clear();

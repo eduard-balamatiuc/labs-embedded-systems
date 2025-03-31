@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "globals.h"
 #include "TaskManager.h"
+#include <stdio.h>
 
 void setup() {
   Serial.begin(115200);
@@ -13,7 +14,7 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   
-  Serial.println("Ultrasonic Distance Sensor with Filtering");
+  printf("Ultrasonic Distance Sensor with Filtering\n");
   
   // Initialize FreeRTOS tasks
   initTasks();
