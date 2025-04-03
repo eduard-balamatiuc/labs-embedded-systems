@@ -2,6 +2,16 @@
 #include <stdio.h>
 #include "relay.h"
 
+// Custom printf replacement that uses Serial
+void debug_printf(const char* format, ...) {
+  char buffer[256];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  va_end(args);
+  Serial.print(buffer);
+}
+
 Relay relay(3); // Create relay object connected to pin 3
 char inputBuffer[50];
 char command[20];
@@ -11,17 +21,19 @@ const unsigned long messageInterval = 3000; // 3 seconds between messages
 
 void setup() {
   Serial.begin(9600);
+  // Wait for serial port to connect (especially important for native USB port)
+  delay(1000); // Give time for serial connection to establish
   while(!Serial) {
     ; // Wait for serial port to connect
   }
-  printf("Relay control system ready. Enter 'relay on' or 'relay off'\n");
+  debug_printf("Relay control system ready. Enter 'relay on' or 'relay off'\n");
 }
 
 void loop() {
   // Print waiting message at intervals
   unsigned long currentMillis = millis();
   if (currentMillis - lastMessageTime >= messageInterval) {
-    printf("Waiting for command...\n");
+    debug_printf("Waiting for command...\n");
     lastMessageTime = currentMillis;
   }
 
@@ -47,7 +59,7 @@ void loop() {
   
   // Process command when complete
   if (commandReceived) {
-    printf("Command received: %s\n", inputBuffer);
+    debug_printf("Command received: %s\n", inputBuffer);
     
     // Use sscanf to parse the command
     if (sscanf(inputBuffer, "%19s", command) == 1) {
@@ -56,18 +68,18 @@ void loop() {
         if (sscanf(inputBuffer, "%*s %19s", command) == 1) {
           if (strcmp(command, "on") == 0) {
             relay.turnOn();
-            printf("Command executed: Relay turned ON\n");
+            debug_printf("Command executed: Relay turned ON\n");
           } else if (strcmp(command, "off") == 0) {
             relay.turnOff();
-            printf("Command executed: Relay turned OFF\n");
+            debug_printf("Command executed: Relay turned OFF\n");
           } else {
-            printf("Unknown command parameter: %s\n", command);
-            printf("Available commands: 'relay on', 'relay off'\n");
+            debug_printf("Unknown command parameter: %s\n", command);
+            debug_printf("Available commands: 'relay on', 'relay off'\n");
           }
         }
       } else {
-        printf("Unknown command: %s\n", command);
-        printf("Available commands: 'relay on', 'relay off'\n");
+        debug_printf("Unknown command: %s\n", command);
+        debug_printf("Available commands: 'relay on', 'relay off'\n");
       }
     }
     
