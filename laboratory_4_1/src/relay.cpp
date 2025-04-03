@@ -1,25 +1,24 @@
 #include "relay.h"
-#include <Arduino.h>
+#include <stdio.h>
 
 Relay::Relay(uint8_t pin) {
     this->pin = pin;
     this->state = false;
     pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
-    Serial.print("Relay initialized on pin ");
-    Serial.println(pin);
+    printf("Relay initialized on pin %d\n", pin);
 }
 
 void Relay::turnOn() {
     digitalWrite(pin, LOW);
     state = true;
-    Serial.println("Relay state: ON");
+    printf("Relay state: ON\n");
 }
 
 void Relay::turnOff() {
     digitalWrite(pin, HIGH);
     state = false;
-    Serial.println("Relay state: OFF");
+    printf("Relay state: OFF\n");
 }
 
 bool Relay::getState() const {
