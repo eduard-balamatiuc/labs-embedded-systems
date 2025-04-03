@@ -1,54 +1,68 @@
-# Laboratory 3_1 - Sensor Data Acquisition with FreeRTOS
+# Laboratory 4_1 - Relay Control System
 
-This project implements sensor data acquisition using FreeRTOS with an ultrasonic distance sensor (HC-SR04), displaying the results on both an LCD display and serial monitor.
+This project implements a simple relay control system that can be controlled via serial commands. The system allows for turning a relay on and off through the serial interface.
 
 ## Hardware Requirements
 
 - Arduino Uno or compatible board
-- HC-SR04 Ultrasonic Sensor
-- I2C LCD Display (16x2)
-- Jumper wires
-- Breadboard
+- Relay module (connected to pin 3)
+- USB cable for programming and serial communication
+- Optional: Device to be controlled by the relay (e.g., lamp, fan, etc.)
 
 ## Pin Connections
 
-- **Ultrasonic Sensor**:
-  - Trigger Pin: 9
-  - Echo Pin: 8
+- **Relay Module**:
+  - Signal Pin: 3
   - VCC: 5V
   - GND: GND
 
-- **LCD Display**:
-  - SDA: A4
-  - SCL: A5
-  - VCC: 5V
-  - GND: GND
+## Software Requirements
+
+- PlatformIO or Arduino IDE
+- Serial terminal (built into PlatformIO or Arduino IDE)
 
 ## Software Structure
 
 The project is organized in a modular structure with the following components:
 
-1. **UltrasonicSensor**: Handles the ultrasonic sensor initialization and distance reading
-2. **LCDDisplay**: Manages the LCD display
-3. **SerialIO**: Handles serial communication for debugging and reporting
-4. **TaskManager**: Coordinates the FreeRTOS tasks
+1. **main.cpp**: Main program loop with serial communication handling
+2. **relay.cpp/h**: Relay control module
+3. **stdio_redirect.cpp**: Utility for redirecting printf to Serial
 
-## FreeRTOS Tasks
+## Command Interface
 
-- **sensorTask**: Reads distance from the ultrasonic sensor every 100ms
-- **displayTask**: Updates the LCD display every 200ms
-- **statusTask**: Reports system status via Serial every 500ms
+The system accepts the following commands via serial:
+- `relay on`: Turns the relay on
+- `relay off`: Turns the relay off
+
+## Command Processing
+
+1. Serial input is read character by character and echoed back to the user
+2. Commands are buffered until a newline character is received
+3. The command is parsed and validated
+4. Appropriate action is taken based on the command
+5. Feedback is provided to the user
 
 ## Building and Running
 
 1. Open the project in PlatformIO
 2. Build and upload to your Arduino board
-3. Open the serial monitor (9600 baud) to view the system status reports
+3. Open the serial monitor (9600 baud)
+4. Enter commands to control the relay
 
 ## Implementation Details
 
-- The project demonstrates the use of FreeRTOS for multitasking
-- Task scheduling uses vTaskDelayUntil() for precise timing
-- Task offsets are implemented using vTaskDelay()
-- Inter-task communication is handled with a queue and protected with a mutex
-- System status reporting provides uptime and latest sensor values 
+- Uses a non-blocking approach to read serial input
+- Provides helpful feedback and error messages
+- Sends a "waiting for command" message every 3 seconds
+- Implements a modular design with separate relay control class
+- Serial communication is initialized at 9600 baud
+- Commands are case-sensitive
+
+## Practical Applications
+
+This relay control system can be used for:
+- Home automation projects
+- Remote device control
+- Automated switching of high-voltage devices
+- Integration into larger control systems 
