@@ -1,59 +1,65 @@
 #include <Arduino.h>
-#include "../include/uart_helpers.h"
-#include "../include/motor_driver.h"
-#include "../include/pid_controller.h"
-
-// L298N Motor Driver Pins
-#define EN 9   // Enable pin (PWM)
-#define MC1 3  // Motor Control 1
-#define MC2 2  // Motor Control 2
-
-// Sensor Pins
-#define POT_FEEDBACK 0  // Potentiometer connected to motor (feedback) on A0
-#define POT_SETPOINT 1  // Potentiometer for setting desired position on A1
-
-// PID Constants - you may need to tune these values
-#define KP 2.0       // Proportional gain
-#define KI 0.01      // Integral gain
-#define KD 0.5       // Derivative gain
-#define DEADZONE 5   // Deadzone to prevent motor oscillation
-
-// Serial plotting refresh rate
-#define SERIAL_REFRESH 100  // Refresh rate in ms
-unsigned long lastRefresh = 0;
+#include "pid_control.h"
+#include "fan_control.h"
+#include "tachometer.h"
+#include "serial_monitor.h"
+#include "user_interface.h"
 
 void setup() {
-  // Initialize UART for printf
-  setup_uart_stdio();
+  // Initialize serial communication
+  SerialMonitor_Init();
+  SerialMonitor_PrintMessage("Fan PID Control System Started");
   
-  // Initialize motor driver
-  initMotorDriver(EN, MC1, MC2);
+  // Initialize fan control with 25kHz PWM frequency
+  FanControl_Init(9);  // PWM pin 9
   
-  // Initialize PID controller
-  initPIDController(KP, KI, KD, DEADZONE);
+  // Initialize tachometer (now using simulated RPM)
+  Tachometer_Init(8);  // Tach pin 8
   
-  // Print header for serial plotter
-  printf("PID Position Control System - Variant D\n");
-  printf("SetPoint,CurrentPosition,MotorOutput\n");
+  // Initialize PID controller with tuning parameters
+  PIDControl_Init(0.5, 0.2, 0.05);  // kp, ki, kd
+  PIDControl_SetSetpoint(1500);     // Initial setpoint (RPM)
+  
+  // Initialize user interface
+  UserInterface_Init();
+  
+  // Start fan at 50% speed and wait for it to stabilize
+  SerialMonitor_PrintMessage("Setting initial fan speed to 50%");
+  FanControl_SetSpeed(128);
+  
+  // Allow time for the simulated RPM to stabilize
+  delay(1000);
 }
 
 void loop() {
-  // Read the setpoint from potentiometer
-  double setPoint = analogRead(POT_SETPOINT);
+  // Get current time
+  unsigned long currentTime = millis();
   
-  // Read current position from feedback potentiometer
-  double currentPosition = analogRead(POT_FEEDBACK);
+  // Handle user interface (setpoint adjustments)
+  UserInterface_Update();
+  
+  // Update RPM reading from tachometer (simulated based on PWM)
+  int currentRPM = Tachometer_GetRPM();
   
   // Update PID controller
-  updatePID(setPoint, currentPosition);
+  PIDControl_SetInput(currentRPM);
+  double pidOutput = PIDControl_Compute();
   
-  // Drive motor with calculated speed
-  driveMotor(getMotorSpeed());
+  // Set fan speed based on PID output
+  FanControl_SetSpeed((int)pidOutput);
   
-  // Send data to Serial Plotter at regular intervals
-  unsigned long currentTime = millis();
-  if (currentTime - lastRefresh >= SERIAL_REFRESH) {
-    printf("%.2f,%.2f,%d\n", getSetPoint(), getCurrentPosition(), getMotorSpeed());
-    lastRefresh = currentTime;
+  // Check for deviation and set alarm if needed
+  if (abs(currentRPM - PIDControl_GetSetpoint()) > 300) {
+    // Deviation too large, set alarm
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    digitalWrite(LED_BUILTIN, LOW);
   }
-} 
+  
+  // Report data periodically
+  static unsigned long lastReportTime = 0;
+  if (currentTime - lastReportTime >= 500) {
+    SerialMonitor_ReportData(PIDControl_GetSetpoint(), currentRPM, (int)pidOutput);
+    lastReportTime = currentTime;
+  }
+}
