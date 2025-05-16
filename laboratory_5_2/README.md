@@ -1,48 +1,78 @@
-# PID Position Control System - Modular Version
+# Fan PID Control System
 
-[Here](https://www.tinkercad.com/things/kRTIJ0ZCl6L-pid-position-control-system-modular-version?sharecode=w5TUWh1my_v9xY6lsh-w0ZV344dWPsa-EvmbFcdnJOg) you can find the Tinkercad Implementation.
+This project implements a PID controller for a PC fan, measuring and controlling RPM in real-time using the Arduino platform.
 
-This project implements a PID position control system for controlling a DC motor position using a potentiometer as both input and feedback. The code has been modularized for better maintainability and readability.
+## Hardware Requirements
 
-## Project Structure
+- Arduino Uno or compatible board
+- 12V PC fan with 4 pins
+  - Black: GND
+  - Red: +12V power
+  - Yellow: Tachometer signal (RPM sensor)
+  - Blue: PWM control input
+- 10kΩ pull-up resistor for tachometer signal
+- Power supply (12V for fan, 5V for Arduino)
+- Optional: LED and 220Ω resistor for alarm indication
 
-The project is organized into the following modules:
+## Wiring Diagram
 
-- **Motor Driver Module**: Handles controlling the L298N motor driver
-- **PID Controller Module**: Implements the PID control algorithm
-- **UART Helpers Module**: Provides printf functionality for easier debugging
+```
+PC Fan 4-Pin Connections:
+- Black wire → GND
+- Red wire → External 12V supply
+- Yellow wire → Digital pin 2 (through 10kΩ pull-up resistor)
+- Blue wire → Digital pin 9 (PWM output)
 
-## Hardware Setup
+Optional:
+- LED anode → Digital pin 13 (or built-in LED)
+- LED cathode → GND (through 220Ω resistor)
+```
 
-- Connect L298N motor driver to Arduino:
-  - Enable (EN) → Pin 9 (PWM)
-  - Motor Control 1 (MC1) → Pin 3
-  - Motor Control 2 (MC2) → Pin 2
-  
-- Connect potentiometers:
-  - Feedback potentiometer → A0
-  - Setpoint potentiometer → A1
+## Features
+
+- Real-time RPM measurement using tachometer input
+- PID closed-loop control of fan speed
+- Serial interface for:
+  - Setting target RPM
+  - Reading current system parameters
+  - Running diagnostic tests
+- Alarm indication when RPM deviates significantly from setpoint
+- Data visualization using Arduino Serial Plotter
+
+## Serial Commands
+
+- `+`: Increase target RPM by 100
+- `-`: Decrease target RPM by 100
+- `rXXXX`: Set target RPM directly (e.g., r2000 sets target to 2000 RPM)
+- `d`: Run diagnostic test
+- `p`: Print current parameters
+- `h`: Show help message
+
+## Code Structure
+
+This project is organized in a modular fashion:
+
+- **main.cpp**: Main program flow and initialization
+- **pid_control**: PID controller implementation
+- **tachometer**: RPM measurement from tachometer input
+- **fan_control**: PWM signal generation for fan speed control
+- **serial_monitor**: Serial interface with printf support
+- **user_interface**: User interaction through serial commands
+
+## Using the Serial Plotter
+
+To visualize the PID controller performance:
+1. Upload the code to Arduino
+2. Open Arduino IDE
+3. Select Tools → Serial Plotter
+4. Set baud rate to 9600
+5. The plotter will display Setpoint, RPM, and PWM values in real-time
 
 ## PID Tuning
 
-The PID controller uses the following default constants which can be adjusted in the main.cpp file:
-- KP = 2.0 (Proportional gain)
-- KI = 0.01 (Integral gain)
-- KD = 0.5 (Derivative gain)
+The default PID parameters are:
+- Kp = 0.5
+- Ki = 0.2
+- Kd = 0.05
 
-## Building and Uploading
-
-This project uses PlatformIO for development. To build and upload:
-
-1. Open the project in PlatformIO
-2. Click the "Upload" button
-3. Open the Serial Monitor to view real-time data
-
-## Serial Output
-
-The system outputs real-time data in CSV format:
-```
-SetPoint,CurrentPosition,MotorOutput
-```
-
-This can be used with the Arduino Serial Plotter to visualize the PID control performance. 
+These values can be adjusted in main.cpp for optimal performance with your specific fan. 

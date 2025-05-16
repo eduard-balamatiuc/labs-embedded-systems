@@ -1,28 +1,30 @@
 #include "tachometer.h"
-#include "fan_control.h"
 #include <Arduino.h>
 
 // Constants
-#define MIN_RPM 0
-#define MAX_RPM 3000
-#define MIN_PWM 60    // Minimum PWM where fan starts moving
-#define MAX_PWM 255   // Maximum PWM value
-#define FILTER_SIZE 3 // Size of moving average filter
+#define FILTER_SIZE 5 // Size of moving average filter
+#define FAN_POLES 2   // Most PC fans have 2 poles (2 pulses per revolution)
 
 // Variables
-static int tachometerPin = 8;  // Default tachometer pin
+static int tachometerPin = 2;  // Default tachometer pin
 static int currentRPM = 0;
-static unsigned long lastUpdateTime = 0;
-static int targetRPM = 0; // Target RPM based on current PWM
+static volatile unsigned long pulseCount = 0;
+static unsigned long lastMeasurementTime = 0;
+static const unsigned long measurementInterval = 1000; // 1 second
 
 // Filter variables
 static int rpmReadings[FILTER_SIZE];
 static int readIndex = 0;
 static int rpmTotal = 0;
 
+// Interrupt handler for tachometer pulses
+void countPulse() {
+  pulseCount++;
+}
+
 void Tachometer_Init(int tachPin) {
   tachometerPin = tachPin;
-  pinMode(tachometerPin, INPUT_PULLUP); // Keep this for potential future use
+  pinMode(tachometerPin, INPUT_PULLUP); 
   
   // Initialize the moving average filter
   for (int i = 0; i < FILTER_SIZE; i++) {
@@ -31,53 +33,40 @@ void Tachometer_Init(int tachPin) {
   rpmTotal = 0;
   readIndex = 0;
   
-  // Note: We're no longer using interrupts since we're simulating RPM
+  // Attach interrupt to count pulses
+  attachInterrupt(digitalPinToInterrupt(tachometerPin), countPulse, FALLING);
   
-  Serial.println("Tachometer initialized (using simulated RPM based on PWM)");
+  printf("Tachometer initialized on pin %d\n", tachometerPin);
 }
 
 int Tachometer_GetRPM() {
-  // Get current PWM value from fan control
-  int currentPWM = FanControl_GetSpeed();
-  
-  // Calculate target RPM based on PWM value
-  if (currentPWM < MIN_PWM) {
-    targetRPM = 0;
-  } else {
-    // Map PWM to RPM - use exponential-like curve for more realistic behavior
-    // Formula: RPM = MIN_RPM + (MAX_RPM - MIN_RPM) * ((PWM - MIN_PWM) / (MAX_PWM - MIN_PWM))^1.2
-    float normalizedPWM = (float)(currentPWM - MIN_PWM) / (float)(MAX_PWM - MIN_PWM);
-    float scaleFactor = pow(normalizedPWM, 1.2); // Slightly non-linear response
-    targetRPM = MIN_RPM + (int)((MAX_RPM - MIN_RPM) * scaleFactor);
-  }
-  
-  // Gradually approach the target RPM to simulate fan inertia
   unsigned long currentTime = millis();
-  if (currentTime - lastUpdateTime >= 100) { // Update every 100ms
-    // Move current RPM 10% closer to target RPM each time
-    if (abs(currentRPM - targetRPM) > 10) {
-      currentRPM = currentRPM + (targetRPM - currentRPM) / 10;
-    } else {
-      currentRPM = targetRPM;
-    }
-    
-    // Add small random fluctuation (±2%) to make it more realistic
-    int fluctuation = random(-currentRPM / 50, currentRPM / 50);
-    currentRPM += fluctuation;
-    
-    // Ensure RPM stays in valid range
-    currentRPM = constrain(currentRPM, MIN_RPM, MAX_RPM);
-    
-    lastUpdateTime = currentTime;
-  }
   
-  // Debug output occasionally
-  static unsigned long lastDebugTime = 0;
-  if (millis() - lastDebugTime > 3000) { // Every 3 seconds
-    char buffer[70];
-    sprintf(buffer, "Sim RPM: %d (target: %d, PWM: %d)", currentRPM, targetRPM, currentPWM);
-    Serial.println(buffer);
-    lastDebugTime = millis();
+  // Update RPM measurement every measurementInterval
+  if (currentTime - lastMeasurementTime >= measurementInterval) {
+    // Calculate RPM: (pulses * 60) / (time in seconds * poles)
+    // Detach interrupt temporarily to avoid race conditions
+    detachInterrupt(digitalPinToInterrupt(tachometerPin));
+    
+    // Calculate RPM
+    int rpm = (pulseCount * 60) / (FAN_POLES);
+    
+    // Reset pulse counter
+    pulseCount = 0;
+    
+    // Reattach interrupt
+    attachInterrupt(digitalPinToInterrupt(tachometerPin), countPulse, FALLING);
+    
+    // Update filter
+    rpmTotal = rpmTotal - rpmReadings[readIndex];
+    rpmReadings[readIndex] = rpm;
+    rpmTotal = rpmTotal + rpm;
+    readIndex = (readIndex + 1) % FILTER_SIZE;
+    
+    // Calculate filtered RPM
+    currentRPM = rpmTotal / FILTER_SIZE;
+    
+    lastMeasurementTime = currentTime;
   }
   
   return currentRPM;
